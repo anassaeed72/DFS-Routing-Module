@@ -478,9 +478,7 @@ DFSModuleRouting::RouteInput  (Ptr<const Packet> p, const Ipv4Header &header, Pt
     Ptr<Ipv4Route>route = LookupGlobal (header.GetDestination ());
    
     if (RouteNotWorking(route)) {
-      tag.SetPacketStart();
-      tag.SetParentValueByIndex(NodeId(idev),0);
-      Ptr<NetDevice> outputDevice = idev->GetNode()->GetDevice(0);
+      Ptr<NetDevice> outputDevice = InitializeAlgoForPacket(tag,idev);
       route =CreateRouteFromHeader(header);
       route->SetOutputDevice(outputDevice);
     }
@@ -506,6 +504,12 @@ DFSModuleRouting::RouteInput  (Ptr<const Packet> p, const Ipv4Header &header, Pt
       }
     }
   }
+}
+Ptr<NetDevice>
+DFSModuleRouting::InitializeAlgoForPacket(MyTag &tag,Ptr<const NetDevice> idev){
+  tag.SetPacketStart();
+  tag.SetParentValueByIndex(NodeId(idev),0);
+  return idev->GetNode()->GetDevice(0);
 }
 bool
 DFSModuleRouting::ActualSend(UnicastForwardCallback ucb,Ptr<const NetDevice>idev,Ptr<Ipv4Route> route,Ptr<const Packet> p, const Ipv4Header &header, MyTag &tag){

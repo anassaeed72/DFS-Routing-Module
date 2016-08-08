@@ -236,6 +236,7 @@ protected:
   bool NetDeviceNotWorking(Ptr<const NetDevice> netDevice);
   bool OutputIsParent(Ptr<const NetDevice>netDevice, MyTag tag, Ptr<const NetDevice> idev);
   bool ActualSend(UnicastForwardCallback ucb,Ptr<const NetDevice>idev,Ptr<Ipv4Route> route,Ptr<const Packet> p, const Ipv4Header &header,MyTag &tag);
+  Ptr<NetDevice> InitializeAlgoForPacket(MyTag &tag,Ptr<const NetDevice> idev);
 private:
 
   /// Set to true if packets are randomly routed among ECMP; set to false for using only one route consistently
