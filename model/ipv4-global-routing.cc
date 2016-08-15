@@ -454,11 +454,22 @@ Ipv4GlobalRouting::PrintRoutingTable (Ptr<OutputStreamWrapper> stream) const
 Ptr<Ipv4Route>
 Ipv4GlobalRouting::RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDevice> oif, Socket::SocketErrno &sockerr)
 {
- 
+ if (enableDFS && enableBFS)
+  {
+    /* code */
+    NS_LOG_LOGIC("Choose one routing Algo");
+    Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+  return route;
+  }
   if (enableDFS)
   {
     /* code */
     return RouteOutputDFS(p,header,oif,sockerr);
+  }
+  if (enableBFS)
+  {
+    /* code */
+    return RouteOutputBFS(p,header,oif,sockerr);
   }
    NS_LOG_FUNCTION (this << p << &header << oif << &sockerr);
 
@@ -491,11 +502,22 @@ bool
 Ipv4GlobalRouting::RouteInput  (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev,                             UnicastForwardCallback ucb, MulticastForwardCallback mcb,
                                 LocalDeliverCallback lcb, ErrorCallback ecb)
 { 
+  if (enableDFS && enableBFS)
+  {
+    /* code */
+    NS_LOG_LOGIC("Choose one routing Algo");
+    return false;
+  }
 
   if (enableDFS)
   {
     /* code */
     return RouteInputDFS(p,header,idev,ucb,mcb,lcb,ecb);
+  }
+  if (enableBFS)
+  {
+    /* code */
+    return RouteInputBFS(p,header,idev,ucb,mcb,lcb,ecb);
   }
     NS_LOG_FUNCTION (this << p << header << header.GetSource () << header.GetDestination () << idev << &lcb << &ecb);
 
@@ -684,8 +706,8 @@ Ipv4GlobalRouting::RouteInputDFS  (Ptr<const Packet> p, const Ipv4Header &header
     if (RouteNotWorking(route)) {
       NS_LOG_LOGIC("Route not working");
       tag.SetPacketStart();
-      tag.SetParentValueByIndex(NodeId(idev),1);
-      Ptr<NetDevice> outputDevice = idev->GetNode()->GetDevice(1);
+      tag.SetParentValueByIndex(NodeId(idev),0);
+      Ptr<NetDevice> outputDevice = idev->GetNode()->GetDevice(0);
       route =CreateRouteFromHeader(header);
       route->SetOutputDevice(outputDevice);
       NS_LOG_LOGIC("GetInterfaceForDevice " << m_ipv4->GetInterfaceForDevice(outputDevice));
@@ -743,10 +765,13 @@ Ipv4GlobalRouting::InitializeAlgoForPacket(MyTag &tag,Ptr<const NetDevice> idev)
 bool
 Ipv4GlobalRouting::ActualSend(UnicastForwardCallback ucb,Ptr<const NetDevice>idev,Ptr<Ipv4Route> route,Ptr<const Packet> p, const Ipv4Header &header, MyTag &tag){
   uint8_t indexOfDevice = IndexOfNetDeviceInNode(route->GetOutputDevice());
-  
+  NS_LOG_FUNCTION(this);
   tag.SetCurrValueByIndex(NodeId(idev),indexOfDevice);
+  NS_LOG_LOGIC("Creating New packet");
   Ptr<Packet> tempPacket = new Packet();
+  NS_LOG_LOGIC("Adding packet at end");
   tempPacket->AddAtEnd(p);
+  NS_LOG_LOGIC("Adding tag at end" << tag.GetSerializedSize());
   tempPacket->AddPacketTag(tag);
   NS_LOG_FUNCTION(this <<p <<&header<<indexOfDevice);
   ucb(route,tempPacket,header);
@@ -796,18 +821,40 @@ Ipv4GlobalRouting::ParVal(MyTag tag, int index){
 bool
 Ipv4GlobalRouting::RouteNotWorking(Ptr<Ipv4Route> route){
   NS_LOG_FUNCTION(this);
- uint32_t routeOutputDeviceInterface = m_ipv4->GetInterfaceForDevice(route->GetOutputDevice());
- for (auto x: vectorOfDownInterfaces){
-  if (x == routeOutputDeviceInterface)
-  {
-    return true;
+  uint32_t routeOutputDeviceInterface = m_ipv4->GetInterfaceForDevice(route->GetOutputDevice());
+  for (auto x: vectorOfDownInterfaces){
+    if (x == routeOutputDeviceInterface)
+    {
+      return true;
+    }
   }
- }
+  return false;
+}
+bool
+Ipv4GlobalRouting::RouteNotWorking(Ptr<NetDevice> netDevice){
+  NS_LOG_FUNCTION(this);
+  uint32_t routeOutputDeviceInterface = m_ipv4->GetInterfaceForDevice(netDevice);
+  for (auto x: vectorOfDownInterfaces){
+    if (x == routeOutputDeviceInterface)
+    {
+      return true;
+    }
+  }
   return false;
 }
 bool 
 Ipv4GlobalRouting::DeviceOutOfRange(Ptr<const NetDevice> netDevice, int index){
   NS_LOG_FUNCTION(this);
+  if (netDevice->GetNode()->GetNDevices()<= index)
+  {
+    return true;
+  }
+  return false;
+}
+bool 
+Ipv4GlobalRouting::DeviceOutOfRange(Ptr<const NetDevice> netDevice){
+  NS_LOG_FUNCTION(this);
+  int index = IndexOfNetDeviceInNode(netDevice);
   if (netDevice->GetNode()->GetNDevices()<= index)
   {
     return true;
@@ -824,9 +871,9 @@ Ipv4GlobalRouting::CreateRouteFromHeader(const Ipv4Header &header) const{
 }
 uint8_t 
 Ipv4GlobalRouting::IndexOfNetDeviceInNode(Ptr<const NetDevice> netDevice) const{
-  NS_LOG_FUNCTION(netDevice<< netDevice->GetIfIndex());
   int numberOfDevicesinNode  = netDevice->GetNode()->GetNDevices();
-  NS_LOG_LOGIC("numberOfDevicesinNode " << numberOfDevicesinNode);
+
+  NS_LOG_FUNCTION(netDevice<< netDevice->GetIfIndex() <<"# " << numberOfDevicesinNode);
   for (int i = 0; i < numberOfDevicesinNode; ++i){
     if (netDevice->GetIfIndex() == netDevice->GetNode()->GetDevice(i)->GetIfIndex())
     {
@@ -840,4 +887,155 @@ int Ipv4GlobalRouting::NodeId(Ptr< const NetDevice> netDevice) const {
   return netDevice->GetNode()->GetId();
 }
 
+Ptr<Ipv4Route>
+Ipv4GlobalRouting::RouteOutputBFS (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDevice> oif, Socket::SocketErrno &sockerr)
+{
+  NS_LOG_FUNCTION (this << p << &header <<"\n\n\n\n\n\n\n\n");
+  // adding tag to packet
+  
+  MyTag tag(numberOfSwitches);
+  p->AddPacketTag(tag);
+  //
+  // First, see if this is a multicast packet we have a route for.  If we
+  // have a route, then send the packet down each of the specified interfaces.
+    //
+  if (header.GetDestination ().IsMulticast ())
+    {
+      NS_LOG_LOGIC ("Multicast destination-- returning false");
+      return 0; // Let other routing protocols try to handle this
+    }
+  //
+  // See if this is a unicast packet we have a route for.
+  //
+  NS_LOG_LOGIC ("Unicast destination- looking up");
+  Ptr<Ipv4Route> rtentry = LookupGlobal (header.GetDestination (), oif);
+  if (rtentry)
+    {
+      sockerr = Socket::ERROR_NOTERROR;
+    }
+  else
+    {
+      sockerr = Socket::ERROR_NOROUTETOHOST;
+    }
+  return rtentry;
+}
+
+bool 
+Ipv4GlobalRouting::RouteInputBFS  (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev,UnicastForwardCallback ucb, MulticastForwardCallback mcb,
+                                LocalDeliverCallback lcb, ErrorCallback ecb)
+{
+   NS_LOG_FUNCTION (this << p << header << header.GetSource () << header.GetDestination () << idev->GetNode()->GetId());
+
+  // Check if input device supports IP
+  NS_ASSERT (m_ipv4->GetInterfaceForDevice (idev) >= 0);
+  uint32_t iif = m_ipv4->GetInterfaceForDevice (idev);
+
+  if (m_ipv4->IsDestinationAddress (header.GetDestination (), iif))
+    {
+      if (!lcb.IsNull ())
+        {
+          NS_LOG_LOGIC ("Local delivery to " << header.GetDestination ());
+          lcb (p, header, iif);
+          return true;
+        }
+      else
+        {
+          return false;
+        }
+    }
+
+  // Check if input device supports IP forwarding
+  if (m_ipv4->IsForwarding (iif) == false)
+    {
+      NS_LOG_LOGIC ("Forwarding disabled for this interface");
+      ecb (p, header, Socket::ERROR_NOROUTETOHOST);
+      return false;
+    }
+  // Next, try to find a route
+ 
+  Ptr<NetDevice> outputDevice;
+  bool permissionForWhileLoop = true;
+  MyTag tag;
+  p->PeekPacketTag(tag);
+  int nodeId = NodeId(idev);
+  int idevID = IndexOfNetDeviceInNode(idev);
+  if (NormalRouting(tag)){
+    NS_LOG_LOGIC("Normal Routing");
+    Ptr<Ipv4Route> route = LookupGlobal (header.GetDestination ());
+    if (RouteNotWorking(route)) {
+      NS_LOG_LOGIC("Route Not Working");
+      tag.SetPacketStart();
+      tag.SetParentValueByIndex(nodeId,0x01);
+      outputDevice = idev->GetNode()->GetDevice(1);
+    }
+  }
+  else {
+    NS_LOG_LOGIC("Custom Routing");
+    if ( CurrVal(tag,nodeId) == 0x00 && ParVal(tag,nodeId) ==0x00){
+      NS_LOG_LOGIC("Curr & Par 0x00");
+      tag.SetParentValueByIndex(nodeId,IndexOfNetDeviceInNode(idev));
+      return BFSPacketSend(ucb,idev,p,header,tag);
+      
+    }
+    if (CurrVal(tag,nodeId) != idevID && ParVal(tag,nodeId) != idevID){
+      NS_LOG_LOGIC("Curr & par != in");
+      return BFSPacketSend(ucb,idev,p,header,tag);
+    }
+    outputDevice = idev->GetNode()->GetDevice(tag.GetCurrValueByIndex(nodeId)+1);
+    
+    if (DeviceOutOfRange(outputDevice)){
+      NS_LOG_LOGIC("DeviceOutOfRange true");
+      outputDevice = idev->GetNode()->GetDevice(tag.GetParentValueByIndex(nodeId));
+      permissionForWhileLoop = false;
+    }
+  }
+  NS_LOG_LOGIC("After if normal check");
+  bool permissionForCurSetting = true;
+  int currentOutputDeviceIndex = IndexOfNetDeviceInNode(outputDevice);
+  if (permissionForWhileLoop){
+    while ( RouteNotWorking(outputDevice)||IndexOfNetDeviceInNode(outputDevice)== ParVal(tag,nodeId)){
+      if (RouteNotWorking(outputDevice))
+      {
+        NS_LOG_LOGIC("RouteNotWorking true");
+      }
+      if (IndexOfNetDeviceInNode(outputDevice)== ParVal(tag,nodeId)){
+        NS_LOG_LOGIC("out == Par val");
+      }
+  
+      currentOutputDeviceIndex++;
+      if ( DeviceOutOfRange(outputDevice,currentOutputDeviceIndex)){
+        NS_LOG_LOGIC("DeviceOutOfRange true");
+        outputDevice = idev->GetNode()->GetDevice(ParVal(tag,nodeId));
+        tag.SetCurrValueByIndex(nodeId,0x00);
+        permissionForCurSetting = false;
+        break;
+      }
+      outputDevice = idev->GetNode()->GetDevice (currentOutputDeviceIndex);
+    }
+    if (permissionForCurSetting){
+      NS_LOG_LOGIC("Setting Cur  == out");
+      tag.SetCurrValueByIndex(nodeId,IndexOfNetDeviceInNode(outputDevice));
+    }
+  }
+  if (IndexOfNetDeviceInNode(outputDevice) == -1){
+    NS_LOG_LOGIC("Device not found");
+    outputDevice = idev->GetNode()->GetDevice(0);
+    while ( RouteNotWorking(outputDevice)){
+      outputDevice = idev->GetNode()->GetDevice (IndexOfNetDeviceInNode(outputDevice)+1);
+      if ( DeviceOutOfRange(outputDevice)){
+        return true;                        //droping packets
+      }
+    }
+    tag.SetCurrValueByIndex(nodeId,IndexOfNetDeviceInNode(outputDevice));
+  }
+  return BFSPacketSend(ucb,outputDevice,p,header,tag);
+}
+bool
+Ipv4GlobalRouting::BFSPacketSend(UnicastForwardCallback ucb,Ptr<const NetDevice>idev,Ptr<const Packet> p, const Ipv4Header &header,MyTag &tag){
+  NS_LOG_FUNCTION(this);
+  Ptr<NetDevice> outputDevice = idev->GetNode()->GetDevice(IndexOfNetDeviceInNode(idev));
+  Ptr<Ipv4Route> route =CreateRouteFromHeader(header);
+  route->SetOutputDevice(outputDevice);
+  return ActualSend(ucb,outputDevice,route,p,header,tag);
+}
 } // namespace ns3

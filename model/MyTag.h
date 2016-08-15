@@ -50,20 +50,20 @@ public:
   return GetTypeId ();
 }
   virtual uint32_t GetSerializedSize (void) const{
-  // SetTagItems(2);
-  return (uint8_t)((int)GetTagItems() +1);
+  return GetTagItems();
 }
   virtual void Serialize (TagBuffer i) const{
   
   std::cout <<"Serialize called\n";
   i.WriteU8((uint8_t)m_simpleValue.size());
   i.WriteVector (m_simpleValue);
-  std::cout << "Serialize done";
+  std::cout << "Serialize done\n";
   printTag();
 }
   virtual void Deserialize (TagBuffer i){
   std::cout <<"Deserialize called\n";
   int itemsToRead = (int) i.ReadU8();
+  SetTagItems(itemsToRead);
   m_simpleValue = i.ReadVector (itemsToRead);
   printTag();
 }
@@ -121,7 +121,7 @@ public:
   void SetInputPort(uint8_t portNumber);
   uint8_t GetInputPort(void) const;
   void printTag(MyTag tag){
-  std::cout << "Printing tag size = "<< tag.GetSimpleValue().size()  << "\nv= ";
+  std::cout << "Printing tag size = "<< tag.GetSerializedSize()  << "\nv= ";
   for( uint8_t x: tag.GetSimpleValue()){
     std::cout << x << " ";
   }

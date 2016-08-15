@@ -248,6 +248,19 @@ protected:
    bool RouteInputDFS  (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev,
                             UnicastForwardCallback ucb, MulticastForwardCallback mcb,
                             LocalDeliverCallback lcb, ErrorCallback ecb);
+
+
+   Ptr<Ipv4Route>
+RouteOutputBFS (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDevice> oif, Socket::SocketErrno &sockerr);
+
+bool 
+RouteInputBFS  (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev,UnicastForwardCallback ucb, MulticastForwardCallback mcb,
+                                LocalDeliverCallback lcb, ErrorCallback ecb);
+bool
+BFSPacketSend(UnicastForwardCallback ucb,Ptr<const NetDevice>idev,Ptr<const Packet> p, const Ipv4Header &header,MyTag &tag);
+bool RouteNotWorking(Ptr<NetDevice> netDevice);
+bool DeviceOutOfRange(Ptr<const NetDevice> netDevice);
+
 private:
   /// Set to true if packets are randomly routed among ECMP; set to false for using only one route consistently
   bool m_randomEcmpRouting;
@@ -286,7 +299,8 @@ private:
   Ptr<Ipv4> m_ipv4; //!< associated IPv4 instance
   int numberOfSwitches = 4;
   int delta = 2;
-  bool enableDFS = true;
+  bool enableDFS = false;
+  bool enableBFS = true;
   std::vector<uint32_t> vectorOfDownInterfaces;
 };
 
