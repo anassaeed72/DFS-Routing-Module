@@ -260,7 +260,7 @@ bool
 BFSPacketSend(UnicastForwardCallback ucb,Ptr<const NetDevice>idev,Ptr<const Packet> p, const Ipv4Header &header,MyTag &tag);
 bool RouteNotWorking(Ptr<NetDevice> netDevice);
 bool DeviceOutOfRange(Ptr<const NetDevice> netDevice);
-
+Ptr<NetDevice> GetDevicePlusOne(Ptr<const NetDevice> netDevice, int index);
 private:
   /// Set to true if packets are randomly routed among ECMP; set to false for using only one route consistently
   bool m_randomEcmpRouting;

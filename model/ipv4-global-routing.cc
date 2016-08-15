@@ -706,8 +706,8 @@ Ipv4GlobalRouting::RouteInputDFS  (Ptr<const Packet> p, const Ipv4Header &header
     if (RouteNotWorking(route)) {
       NS_LOG_LOGIC("Route not working");
       tag.SetPacketStart();
-      tag.SetParentValueByIndex(NodeId(idev),0);
-      Ptr<NetDevice> outputDevice = idev->GetNode()->GetDevice(0);
+      tag.SetParentValueByIndex(NodeId(idev),1);
+      Ptr<NetDevice> outputDevice = GetDevicePlusOne(idev,1);
       route =CreateRouteFromHeader(header);
       route->SetOutputDevice(outputDevice);
       NS_LOG_LOGIC("GetInterfaceForDevice " << m_ipv4->GetInterfaceForDevice(outputDevice));
@@ -719,11 +719,11 @@ Ipv4GlobalRouting::RouteInputDFS  (Ptr<const Packet> p, const Ipv4Header &header
       NS_LOG_LOGIC("Curr Tag 00");
       tag.SetParentValueByIndex(NodeId(idev),IndexOfNetDeviceInNode(idev));
     }
-    Ptr<NetDevice> outputDevice = idev->GetNode()->GetDevice(CurrVal(tag,NodeId(idev))+1);
+    Ptr<NetDevice> outputDevice = GetDevicePlusOne(idev,CurrVal(tag,NodeId(idev))+1);
     NS_LOG_LOGIC("outputDevice index" << IndexOfNetDeviceInNode(outputDevice));
     if (DeviceOutOfRange(outputDevice,IndexOfNetDeviceInNode(outputDevice))){
       NS_LOG_LOGIC("DeviceOutOfRange true");
-      outputDevice = idev->GetNode()->GetDevice(ParVal(tag,NodeId(idev)));
+      outputDevice = GetDevicePlusOne(idev,ParVal(tag,NodeId(idev)));
       Ptr<Ipv4Route> route =CreateRouteFromHeader(header);
       route->SetOutputDevice(outputDevice);
       return ActualSend(ucb,idev,route,p,header,tag);
@@ -735,12 +735,12 @@ Ipv4GlobalRouting::RouteInputDFS  (Ptr<const Packet> p, const Ipv4Header &header
       currentOutputDeviceIndex++;
       if (DeviceOutOfRange(outputDevice,currentOutputDeviceIndex)){
         NS_LOG_LOGIC("DeviceOutOfRange");
-        outputDevice = idev->GetNode()->GetDevice(ParVal(tag,NodeId(idev)));
+        outputDevice = GetDevicePlusOne(idev,ParVal(tag,NodeId(idev)));
         Ptr<Ipv4Route> route =CreateRouteFromHeader(header);
         route->SetOutputDevice(outputDevice);
         return ActualSend(ucb,idev,route,p,header,tag);
       }
-      outputDevice = idev->GetNode()->GetDevice(currentOutputDeviceIndex);
+      outputDevice = GetDevicePlusOne(idev,currentOutputDeviceIndex);
       int a=1;
     }
     NS_LOG_LOGIC("After While Loop");
@@ -759,8 +759,8 @@ Ipv4GlobalRouting::writeToFile(std::string input){
 Ptr<NetDevice>
 Ipv4GlobalRouting::InitializeAlgoForPacket(MyTag &tag,Ptr<const NetDevice> idev){
   tag.SetPacketStart();
-  tag.SetParentValueByIndex(NodeId(idev),0);
-  return idev->GetNode()->GetDevice(0);
+  tag.SetParentValueByIndex(NodeId(idev),1);
+  return GetDevicePlusOne(idev,1);
 }
 bool
 Ipv4GlobalRouting::ActualSend(UnicastForwardCallback ucb,Ptr<const NetDevice>idev,Ptr<Ipv4Route> route,Ptr<const Packet> p, const Ipv4Header &header, MyTag &tag){
@@ -878,10 +878,14 @@ Ipv4GlobalRouting::IndexOfNetDeviceInNode(Ptr<const NetDevice> netDevice) const{
     if (netDevice->GetIfIndex() == netDevice->GetNode()->GetDevice(i)->GetIfIndex())
     {
       NS_LOG_FUNCTION("returning index"<<i);
-      return (uint8_t)(i);
+      return (uint8_t)(i+1);
     }
   }
   return (uint8_t)-1;
+}
+Ptr<NetDevice> 
+Ipv4GlobalRouting::GetDevicePlusOne(Ptr<const NetDevice> netDevice, int index){
+  return netDevice->GetNode()->GetDevice(--index);
 }
 int Ipv4GlobalRouting::NodeId(Ptr< const NetDevice> netDevice) const {
   return netDevice->GetNode()->GetId();
@@ -966,7 +970,7 @@ Ipv4GlobalRouting::RouteInputBFS  (Ptr<const Packet> p, const Ipv4Header &header
       NS_LOG_LOGIC("Route Not Working");
       tag.SetPacketStart();
       tag.SetParentValueByIndex(nodeId,0x01);
-      outputDevice = idev->GetNode()->GetDevice(1);
+      outputDevice = GetDevicePlusOne(idev,1);
     }
   }
   else {
@@ -981,11 +985,11 @@ Ipv4GlobalRouting::RouteInputBFS  (Ptr<const Packet> p, const Ipv4Header &header
       NS_LOG_LOGIC("Curr & par != in");
       return BFSPacketSend(ucb,idev,p,header,tag);
     }
-    outputDevice = idev->GetNode()->GetDevice(tag.GetCurrValueByIndex(nodeId)+1);
+    outputDevice =GetDevicePlusOne(idev,tag.GetCurrValueByIndex(nodeId)+1);
     
     if (DeviceOutOfRange(outputDevice)){
       NS_LOG_LOGIC("DeviceOutOfRange true");
-      outputDevice = idev->GetNode()->GetDevice(tag.GetParentValueByIndex(nodeId));
+      outputDevice = GetDevicePlusOne(idev,tag.GetParentValueByIndex(nodeId));
       permissionForWhileLoop = false;
     }
   }
@@ -1005,12 +1009,12 @@ Ipv4GlobalRouting::RouteInputBFS  (Ptr<const Packet> p, const Ipv4Header &header
       currentOutputDeviceIndex++;
       if ( DeviceOutOfRange(outputDevice,currentOutputDeviceIndex)){
         NS_LOG_LOGIC("DeviceOutOfRange true");
-        outputDevice = idev->GetNode()->GetDevice(ParVal(tag,nodeId));
+        outputDevice =GetDevicePlusOne(idev,ParVal(tag,nodeId));
         tag.SetCurrValueByIndex(nodeId,0x00);
         permissionForCurSetting = false;
         break;
       }
-      outputDevice = idev->GetNode()->GetDevice (currentOutputDeviceIndex);
+      outputDevice = GetDevicePlusOne(idev,currentOutputDeviceIndex);
     }
     if (permissionForCurSetting){
       NS_LOG_LOGIC("Setting Cur  == out");
@@ -1019,9 +1023,9 @@ Ipv4GlobalRouting::RouteInputBFS  (Ptr<const Packet> p, const Ipv4Header &header
   }
   if (IndexOfNetDeviceInNode(outputDevice) == -1){
     NS_LOG_LOGIC("Device not found");
-    outputDevice = idev->GetNode()->GetDevice(0);
+    outputDevice =GetDevicePlusOne(idev,1);
     while ( RouteNotWorking(outputDevice)){
-      outputDevice = idev->GetNode()->GetDevice (IndexOfNetDeviceInNode(outputDevice)+1);
+      outputDevice = GetDevicePlusOne(idev,IndexOfNetDeviceInNode(outputDevice)+1);
       if ( DeviceOutOfRange(outputDevice)){
         return true;                        //droping packets
       }
